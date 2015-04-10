@@ -1,0 +1,4 @@
+bin/
+data/
+Lambchop/.nuget/NuGet.exe
+packages/
