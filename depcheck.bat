@@ -60,7 +60,7 @@ set BASEDIR=%~dp0\dc
 set REPO=
 
 @REM set JAVACMD=java
-JAVACMD="F:\TeamCity\buildAgent\bin\..\..\jre\bin\java.exe"
+set JAVACMD="F:\TeamCity\buildAgent\bin\..\..\jre\bin\java.exe"
 
 if "%REPO%"=="" set REPO=%BASEDIR%\repo
 
