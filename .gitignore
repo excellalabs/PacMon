@@ -1,6 +1,5 @@
 bin/
 data/
-Lambchop/.nuget/NuGet.exe
 packages/
 output.xml
 vulnerabilities.html
