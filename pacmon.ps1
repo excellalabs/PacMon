@@ -100,9 +100,7 @@ function Parse-Dependencies($dependencies) {
 function Parse-Dependency($dependency) {
 	[string]$name = Clean-String($dependency.fileName)
 	[string]$description = Clean-String($dependency.description)
-	$vulnerabilities = $dependency.vulnerabilities.vulnerability
-	$suppressedVulnerabilities = $dependency.vulnerabilities.suppressedVulnerability
-	
+
 	Start-Test $name
 	
 	if ($description) {
@@ -110,7 +108,7 @@ function Parse-Dependency($dependency) {
 	}
 	
 	if ($dependency.vulnerabilities) {
-		Parse-Vulnerabilities $name $vulnerabilities $suppressedVulnerabilities
+		Parse-Vulnerabilities $name $dependency.vulnerabilities.vulnerability $dependency.vulnerabilities.suppressedVulnerability
 	}
 	
 	End-Test($name)
@@ -139,14 +137,14 @@ function Parse-Vulnerabilities([string]$name, $vulnerabilities, $suppressedVulne
 
 function Parse-Vulnerability([string]$name, $vulnerability, [string]$action){
 	[string]$vulnerabilityName = Clean-String($vulnerability.name)
-	
-	if ($action){
-		[string]$vulnerabilitySeverity = "Suppressed"
+	[string]$vulnerabilitySeverity = Clean-String($vulnerability.severity)
+		
+	if (($action -eq "ignore") -or ($action -eq "update")){
+		[string]$message = "SUPPRESSED: {0} ({1})" -f $vulnerabilityName, $vulnerabilitySeverity
 	} else {
-		[string]$vulnerabilitySeverity = Clean-String($vulnerability.severity)
+		[string]$message = "{0} ({1})" -f $vulnerabilityName, $vulnerabilitySeverity
 	}
 	
-	[string]$message = "{0} ({1})" -f $vulnerabilityName, $vulnerabilitySeverity
 	[string]$details = Clean-String($vulnerability.description)
 	
 	if ($action -eq "ignore") {
@@ -171,22 +169,27 @@ function Has-Vulnerability($dependencies) {
 ### TeamCity Test Service Message functions
 
 function Start-Test([string]$name){
+	Write-Output ("Starting Test: '{0}'" -f $name)
 	Write-Output ("##teamcity[testStarted name='{0}']" -f $name)
 }
 
 function Update-Test([string]$name, [string]$message){
+	Write-Output ("Updating Test: '{0}'" -f $name)
 	Write-Output ("##teamcity[testStdOut name='{0}' out='{1}']" -f $name, $message)
 }
 
 function Ignore-Test([string]$name, [string]$message){
+	Write-Output ("Ignoring Test: '{0}'" -f $name)
 	Write-Output ("##teamcity[testIgnored name='{0}' message='{1}']" -f $name, $message)
 }
 
 function Fail-Test([string]$name, [string]$message, [string]$details){
+	Write-Output ("Failing Test: '{0}'" -f $name)
 	Write-Output ("##teamcity[testFailed name='{0}' message='{1}' details='{2}']" -f $name, $message, $details)
 }
 
 function End-Test([string]$name){
+	Write-Output ("Finishing Test '{0}'" -f $name)
 	Write-Output ("##teamcity[testFinished name='{0}']" -f $name)
 }
 
@@ -251,7 +254,7 @@ Set-PSConsole
 
 Parse-Dependencies $dependencies
 
-Delete-File $xmlPath
+#Delete-File $xmlPath
 
 if (Has-Vulnerability $dependencies) {
 	Write-Output ("Vulnerability found -- generating report artifact: {0}" -f $htmlFilename)
