@@ -101,12 +101,8 @@ function Parse-Dependency($dependency) {
 	[string]$name = Clean-String($dependency.fileName)
 	[string]$description = Clean-String($dependency.description)
 
-	Start-Test $name
-	
-	if ($description) {
-		Update-Test $name $description
-	}
-	
+	Start-Test $name $description
+
 	if ($dependency.vulnerabilities) {
 		Parse-Vulnerabilities $name $dependency.vulnerabilities.vulnerability $dependency.vulnerabilities.suppressedVulnerability
 	}
@@ -126,11 +122,11 @@ function Parse-Vulnerabilities([string]$name, $vulnerabilities, $suppressedVulne
 	
 	if ($suppressed) {
 		Foreach ($vulnerability in $suppressedVulnerabilities) {
-			if ($failed) {
-				Parse-Vulnerability $name $vulnerability "update"
-			} else {
+			#if ($failed) {
+			#	Parse-Vulnerability $name $vulnerability "update"
+			#} else {
 				Parse-Vulnerability $name $vulnerability "ignore"
-			}
+			#}
 		}
 	}
 }
@@ -168,9 +164,9 @@ function Has-Vulnerability($dependencies) {
 
 ### TeamCity Test Service Message functions
 
-function Start-Test([string]$name){
+function Start-Test([string]$name, [string]$message){
+	Write-Output ("##teamcity[testStarted name='{0}' captureStandardOutput='{1}]" -f $name, $message)
 	Write-Output ("Starting Test: '{0}'" -f $name)
-	Write-Output ("##teamcity[testStarted name='{0}']" -f $name)
 }
 
 function Update-Test([string]$name, [string]$message){
