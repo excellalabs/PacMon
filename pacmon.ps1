@@ -33,11 +33,10 @@ function parseVulnerabilities([string]$name, $vulnerabilities){
 function parseVulnerability([string]$name, $vulnerability){
 	[string]$vulnerabilityName = cleanString($vulnerability.name)
 	[string]$vulnerabilitySeverity = cleanString($vulnerability.severity)
-	[string]$vulnerabilityDescription = cleanString($vulnerability.description)
-
-	[string]$error = "{0} ({1}): {2}" -f $vulnerabilityName, $vulnerabilitySeverity, $vulnerabilityDescription
+	[string]$message = "{0} ({1})" -f $vulnerabilityName, $vulnerabilitySeverity
+	[string]$details = cleanString($vulnerability.description)
 	
-	errorTest $name $error
+	failTest $name $message $details
 }
 
 function hasVulnerability($dependencies) {
@@ -60,8 +59,8 @@ function updateTest([string]$name, [string]$text){
 	Write-Output $formattedOutput
 }
 
-function errorTest([string]$name, [string]$error){
-	[string]$formattedOutput = "##teamcity[testStdErr name='{0}' out='{1}']" -f $name, $error
+function failTest([string]$name, [string]$message, [string]$details){
+	[string]$formattedOutput = "##teamcity[testStdErr name='{0}' message='{1}' details='{2}']" -f $name, $message, $details
 	Write-Output $formattedOutput
 }
 
@@ -126,7 +125,7 @@ if (Test-Path $xmlPath) {
 
 if (!$xml.analysis) {
 	Write-Error "XML contains no analysis"
-	#Invoke-Expression $deleteCommand
+	Invoke-Expression $deleteCommand
 	exit(1)
 }
 
@@ -134,7 +133,7 @@ $dependencies = $xml.analysis.dependencies.dependency
 
 if (!$dependencies) {
 	Write-Error "Analysis contains no dependencies"
-	#Invoke-Expression $deleteCommand
+	Invoke-Expression $deleteCommand
 	exit(0)
 }
 
@@ -142,7 +141,7 @@ Set-PSConsole
 
 parseDependencies $dependencies
 
-#Invoke-Expression $deleteCommand
+Invoke-Expression $deleteCommand
 
 if (hasVulnerability $dependencies) {
 	Write-Output ("Vulnerability found -- generating report artifact: {0}" -f $htmlFilename)
