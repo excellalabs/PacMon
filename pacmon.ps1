@@ -165,7 +165,7 @@ function Has-Vulnerability($dependencies) {
 ### TeamCity Test Service Message functions
 
 function Start-Test([string]$name, [string]$message){
-	Write-Output ("##teamcity[testStarted name='{0}' captureStandardOutput='{1}]" -f $name, $message)
+	Write-Output ("##teamcity[testStarted name='{0}' captureStandardOutput='{1}']" -f $name, $message)
 	Write-Output ("Starting Test: '{0}'" -f $name)
 }
 
