@@ -8,13 +8,16 @@ Param(
 	[string]$target,
 	
 	[Parameter(Mandatory=$FALSE)]
-	[string]$java="java",	
+	[string]$java = "java",	
 	
 	[Parameter(Mandatory=$FALSE)]
 	[string]$opts,
 	
 	[Parameter(Mandatory=$FALSE)]
-	[string]$dc="dc",
+	[string]$etc,
+	
+	[Parameter(Mandatory=$FALSE)]
+	[string]$dc = "dc",
 	
 	[Parameter(Mandatory=$FALSE)]
 	[string]$s = "suppress.xml",
@@ -32,7 +35,8 @@ function Run-DependencyCheck([string]$javaCmd, [string]$dcPath, [string]$cmdLine
 	[string]$repoPath = '{0}\repo' -f $dcPath
 	[string]$classPath = '"{0}"\etc;"{1}"\commons-cli\commons-cli\1.2\commons-cli-1.2.jar;"{1}"\org\owasp\dependency-check-core\1.2.9\dependency-check-core-1.2.9.jar;"{1}"\org\apache\commons\commons-compress\1.9\commons-compress-1.9.jar;"{1}"\commons-io\commons-io\2.4\commons-io-2.4.jar;"{1}"\commons-lang\commons-lang\2.6\commons-lang-2.6.jar;"{1}"\org\apache\lucene\lucene-core\4.7.2\lucene-core-4.7.2.jar;"{1}"\org\apache\lucene\lucene-analyzers-common\4.7.2\lucene-analyzers-common-4.7.2.jar;"{1}"\org\apache\lucene\lucene-queryparser\4.7.2\lucene-queryparser-4.7.2.jar;"{1}"\org\apache\lucene\lucene-queries\4.7.2\lucene-queries-4.7.2.jar;"{1}"\org\apache\lucene\lucene-sandbox\4.7.2\lucene-sandbox-4.7.2.jar;"{1}"\org\apache\velocity\velocity\1.7\velocity-1.7.jar;"{1}"\commons-collections\commons-collections\3.2.1\commons-collections-3.2.1.jar;"{1}"\com\h2database\h2\1.3.176\h2-1.3.176.jar;"{1}"\org\jsoup\jsoup\1.7.2\jsoup-1.7.2.jar;"{1}"\org\owasp\dependency-check-utils\1.2.9\dependency-check-utils-1.2.9.jar;"{1}"\org\owasp\dependency-check-cli\1.2.9\dependency-check-cli-1.2.9.jar' -f $dcPath, $repoPath						  
 	$command = '{0} -classpath {1} -Dapp.name="dependency-check" -Dapp.repo="{2}" -Dapp.home="{3}" -Dbasedir="{3}" org.owasp.dependencycheck.App {4}' -f $javaCmd, $classPath, $repoPath, $dcPath, $cmdLineArgs
-	cmd.exe /C $command
+	Write-Output ("Executing: cmd.exe /C {0}" -f $command)
+	& cmd.exe /C $command
 }
 
 function Get-Dependencies([string]$xmlPath) {
@@ -130,6 +134,27 @@ function End-Test([string]$name){
 	Write-Output ("##teamcity[testFinished name='{0}']" -f $name)
 }
 
+function Get-FileExtensionFromPath([string]$path){
+	$parts = $path.Split('.')
+	$ext = $parts[$parts.Length-1]
+	$ext.ToUpper()
+}
+
+function Get-Args([string]$inputFilePath, [string]$outputFilePath, [string]$suppressionFilePath, [string]$additionalArgs){
+	$format = Get-FileExtensionFromPath $outputFilePath
+	[string]$dcArgs = '-a "VulnerabilityScan" -s "{0}" -o "{1}" -f "{2}"' -f $inputFilePath, $outputFilePath, $format
+	
+	if (Test-Path $suppressionFilePath) {
+		$dcArgs = '{0} --suppression "{1}"' -f $dcArgs, $suppressionFilePath
+	}
+	
+	if ($additionalArgs) {
+		$dcArgs = '{0} {1}' -f $dcArgs, $additionalArgs
+	}
+	
+	$dcArgs
+}
+
 #
 # http://stackoverflow.com/questions/1183183/path-of-currently-executing-powershell-script
 #
@@ -169,14 +194,7 @@ function Set-PSConsole {
 
 [string]$javaCmd = '{0} {1}' -f $java, $opts
 
-if (Test-Path $suppressPath) {
-	[string]$scanArgs = '-a "VulnerabilityScan" -s "{0}" -o "{1}" -f "XML" --suppression "{2}"' -f $inputPath, $xmlPath, $suppressPath
-	[string]$artifactArgs = '-a "VulnerabilityScan" -s "{0}" -o "{1}" -f "HTML" --suppression "{2}"' -f $inputPath, $htmlPath, $suppressPath
-} else {
-	[string]$scanArgs = '-a "VulnerabilityScan" -s "{0}" -o "{1}" -f "XML"' -f $inputPath, $xmlPath
-	[string]$artifactArgs = '-a "VulnerabilityScan" -s "{0}" -o "{1}" -f "HTML"' -f $inputPath, $htmlPath
-}
-
+[string]$scanArgs = Get-Args $inputPath $xmlPath $suppressPath $etc
 Run-DependencyCheck $javaCmd $dcPath $scanArgs
 
 $dependencies = Get-Dependencies $xmlPath
@@ -189,6 +207,7 @@ Invoke-Expression ('DEL {0}' -f $xmlPath)
 
 if (Has-Vulnerability $dependencies) {
 	Write-Output ("Vulnerability found -- generating report artifact: {0}" -f $htmlFilename)
+	[string]$artifactArgs = Get-Args $inputPath $htmlPath $suppressPath $etc
 	Run-DependencyCheck $javaCmd $dcPath $artifactArgs
 }
 

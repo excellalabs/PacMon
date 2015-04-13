@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <suppressions xmlns="https://www.owasp.org/index.php/OWASP_Dependency_Check_Suppression">
 	<suppress>
+		<notes><![CDATA[
+		file name: jQuery.2.1.3.nupkg
+		]]></notes>
+		<sha1>17245DA7DAB3799B45815A105B8FFA414CF73D43</sha1>
+		<cpe>cpe:/a:jquery:jquery:2.1.3</cpe>
 	</suppress>
 </suppressions>
