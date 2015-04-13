@@ -2,9 +2,9 @@
 <suppressions xmlns="https://www.owasp.org/index.php/OWASP_Dependency_Check_Suppression">
 	<suppress>
 		<notes><![CDATA[
-		file name: jQuery.2.1.3.nupkg
+		file name: jQuery.2.1.3.nupkg: jQuery.nuspec
 		]]></notes>
-		<sha1>17245DA7DAB3799B45815A105B8FFA414CF73D43</sha1>
-		<cpe>cpe:/a:jquery:jquery:2.1.3</cpe>
+		<sha1>C7222903F6C09F73C11769B107410E0735264A4E</sha1>
+		<cve>CVE-2007-2379</cve>
 	</suppress>
 </suppressions>
