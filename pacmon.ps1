@@ -54,12 +54,6 @@ function Get-DependencyCheckArgs([string]$inputFilePath, [string]$outputFilePath
 	$dcArgs
 }
 
-function Get-FileExtensionFromPath([string]$path){
-	$parts = $path.Split('.')
-	$ext = $parts[$parts.Length-1]
-	$ext.ToUpper()
-}
-
 function Run-DependencyCheck([string]$javaCmd, [string]$dcPath, [string]$cmdLineArgs){
 	[string]$repoPath = '{0}\repo' -f $dcPath
 	[string]$classPath = '"{0}"\etc;"{1}"\commons-cli\commons-cli\1.2\commons-cli-1.2.jar;"{1}"\org\owasp\dependency-check-core\1.2.9\dependency-check-core-1.2.9.jar;"{1}"\org\apache\commons\commons-compress\1.9\commons-compress-1.9.jar;"{1}"\commons-io\commons-io\2.4\commons-io-2.4.jar;"{1}"\commons-lang\commons-lang\2.6\commons-lang-2.6.jar;"{1}"\org\apache\lucene\lucene-core\4.7.2\lucene-core-4.7.2.jar;"{1}"\org\apache\lucene\lucene-analyzers-common\4.7.2\lucene-analyzers-common-4.7.2.jar;"{1}"\org\apache\lucene\lucene-queryparser\4.7.2\lucene-queryparser-4.7.2.jar;"{1}"\org\apache\lucene\lucene-queries\4.7.2\lucene-queries-4.7.2.jar;"{1}"\org\apache\lucene\lucene-sandbox\4.7.2\lucene-sandbox-4.7.2.jar;"{1}"\org\apache\velocity\velocity\1.7\velocity-1.7.jar;"{1}"\commons-collections\commons-collections\3.2.1\commons-collections-3.2.1.jar;"{1}"\com\h2database\h2\1.3.176\h2-1.3.176.jar;"{1}"\org\jsoup\jsoup\1.7.2\jsoup-1.7.2.jar;"{1}"\org\owasp\dependency-check-utils\1.2.9\dependency-check-utils-1.2.9.jar;"{1}"\org\owasp\dependency-check-cli\1.2.9\dependency-check-cli-1.2.9.jar' -f $dcPath, $repoPath						  
@@ -68,7 +62,7 @@ function Run-DependencyCheck([string]$javaCmd, [string]$dcPath, [string]$cmdLine
 	& cmd.exe /C $command
 }
 
-function Get-Dependencies([string]$xmlPath) {
+function Validate-Dependencies([string]$xmlPath) {
 	if (!(Test-Path $xmlPath)) {
 		Write-Error ("XML output not found: {0}" -f $xmlPath)
 		exit(1)
@@ -110,26 +104,41 @@ function Parse-Dependency($dependency) {
 	}
 	
 	if ($dependency.vulnerabilities) {
-		Parse-Vulnerabilities $name $vulnerabilities
-		Parse-SuppressedVulnerabilities $name $suppressedVulnerabilities
+		Parse-Vulnerabilities $name $vulnerabilities $suppressedVulnerabilities
 	}
 	
 	End-Test($name)
 }
 
-function Parse-Vulnerabilities([string]$name, $vulnerabilities){
+function Parse-Vulnerabilities([string]$name, $vulnerabilities, $suppressedVulnerabilities){
+	$ignoreTest = (($vulnerabilities.Length -eq 0) -and ($suppressedVulnerabilities.Length -ne 0))
+	
 	Foreach ($vulnerability in $vulnerabilities) {
 		Parse-Vulnerability $name $vulnerability
 	}
+	
+	Foreach ($vulnerability in $suppressedVulnerabilities) {
+		if ($ignoreTest) {
+			Parse-Vulnerability $name $vulnerability "ignore"
+		} else {
+			Parse-Vulnerability $name $vulnerability "update"
+		}
+	}
 }
 
-function Parse-Vulnerability([string]$name, $vulnerability){
+function Parse-Vulnerability([string]$name, $vulnerability, [string]$action){
 	[string]$vulnerabilityName = Clean-String($vulnerability.name)
 	[string]$vulnerabilitySeverity = Clean-String($vulnerability.severity)
 	[string]$message = "{0} ({1})" -f $vulnerabilityName, $vulnerabilitySeverity
 	[string]$details = Clean-String($vulnerability.description)
 	
-	Fail-Test $name $message $details
+	if ($action -eq "ignore") {
+		Ignore-Test $name ('[SUPPRESSED] {0}' -f $message)
+	} elseif ($action -eq "update") {
+		Update-Test $name ('[SUPPRESSED] {0}' -f $message)
+	} else {
+		Fail-Test $name $message $details
+	}
 }
 
 function Parse-SuppressedVulnerabilities([string]$name, $vulnerabilities){
@@ -156,21 +165,14 @@ function Has-Vulnerability($dependencies) {
 	$vulnerabilityFound
 }
 
-function Clean-String([string]$string){
-	$string = $string -replace "`t|`n|`r",""
-	$string = $string -replace " ;|; ",";"
-	$string = $string -replace "'",""
-	$string
-}
-
-### TeamCity Test Service Messages
+### TeamCity Test Service Message functions
 
 function Start-Test([string]$name){
 	Write-Output ("##teamcity[testStarted name='{0}']" -f $name)
 }
 
-function Update-Test([string]$name, [string]$text){
-	Write-Output ("##teamcity[testStdOut name='{0}' out='{1}']" -f $name, $text)
+function Update-Test([string]$name, [string]$message){
+	Write-Output ("##teamcity[testStdOut name='{0}' out='{1}']" -f $name, $message)
 }
 
 function Ignore-Test([string]$name, [string]$message){
@@ -183,6 +185,21 @@ function Fail-Test([string]$name, [string]$message, [string]$details){
 
 function End-Test([string]$name){
 	Write-Output ("##teamcity[testFinished name='{0}']" -f $name)
+}
+
+### General Purpose
+
+function Clean-String([string]$string){
+	$string = $string -replace "`t|`n|`r",""
+	$string = $string -replace " ;|; ",";"
+	$string = $string -replace "'",""
+	$string
+}
+
+function Get-FileExtensionFromPath([string]$path){
+	$parts = $path.Split('.')
+	$ext = $parts[$parts.Length-1]
+	$ext.ToUpper()
 }
 
 function Delete-File([string]$path) {
@@ -231,7 +248,7 @@ function Set-PSConsole {
 [string]$scanArgs = Get-DependencyCheckArgs $inputPath $xmlPath $suppressPath $etc
 Run-DependencyCheck $javaCmd $dcPath $scanArgs
 
-$dependencies = Get-Dependencies $xmlPath
+$dependencies = Validate-Dependencies $xmlPath
 
 Set-PSConsole
 
