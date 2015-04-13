@@ -4,32 +4,61 @@
 
 [CmdletBinding()]
 Param(
+	# -target <relative path to scan>
 	[Parameter(Mandatory=$TRUE)]
 	[string]$target,
 	
+	# -java <full path to java>
 	[Parameter(Mandatory=$FALSE)]
 	[string]$java = "java",	
-	
-	[Parameter(Mandatory=$FALSE)]
-	[string]$opts,
-	
-	[Parameter(Mandatory=$FALSE)]
-	[string]$etc,
-	
+		
+	# -dc <relative path to dependency check>
 	[Parameter(Mandatory=$FALSE)]
 	[string]$dc = "dc",
 	
+	# -opts <java command line parameters>
+	[Parameter(Mandatory=$FALSE)]
+	[string]$opts,
+	
+	# -etc <dependency check command line parameters>
+	[Parameter(Mandatory=$FALSE)]
+	[string]$etc,
+
+	# -s <relative path to suppression file>
 	[Parameter(Mandatory=$FALSE)]
 	[string]$s = "suppress.xml",
 	
+	# -x <relative path to temporary xml file>
 	[Parameter(Mandatory=$FALSE)]
 	[string]$x = "output.xml",
 	
+	# -h <relative path to artifact html file>
 	[Parameter(Mandatory=$FALSE)]
 	[string]$h = "vulnerabilities.html"
 )
 
 ### END INIT PARAMS
+
+function Get-DependencyCheckArgs([string]$inputFilePath, [string]$outputFilePath, [string]$suppressionFilePath, [string]$additionalArgs){
+	$format = Get-FileExtensionFromPath $outputFilePath
+	[string]$dcArgs = '-a "VulnerabilityScan" -s "{0}" -o "{1}" -f "{2}"' -f $inputFilePath, $outputFilePath, $format
+	
+	if (Test-Path $suppressionFilePath) {
+		$dcArgs = '{0} --suppression "{1}"' -f $dcArgs, $suppressionFilePath
+	}
+	
+	if ($additionalArgs) {
+		$dcArgs = '{0} {1}' -f $dcArgs, $additionalArgs
+	}
+	
+	$dcArgs
+}
+
+function Get-FileExtensionFromPath([string]$path){
+	$parts = $path.Split('.')
+	$ext = $parts[$parts.Length-1]
+	$ext.ToUpper()
+}
 
 function Run-DependencyCheck([string]$javaCmd, [string]$dcPath, [string]$cmdLineArgs){
 	[string]$repoPath = '{0}\repo' -f $dcPath
@@ -49,13 +78,13 @@ function Get-Dependencies([string]$xmlPath) {
 
 	if (!$xml.analysis) {
 		Write-Error "XML contains no analysis"
-		Invoke-Expression ('DEL {0}' -f $xmlPath)
+		Delete-File $xmlPath
 		exit(1)
 	}
 	
 	if (!$xml.analysis.dependencies.dependency) {
 		Write-Error "Analysis contains no dependencies"
-		Invoke-Expression ('DEL {0}' -f $xmlPath)
+		Delete-File $xmlPath
 		exit(0)
 	}
 	
@@ -72,6 +101,7 @@ function Parse-Dependency($dependency) {
 	[string]$name = Clean-String($dependency.fileName)
 	[string]$description = Clean-String($dependency.description)
 	$vulnerabilities = $dependency.vulnerabilities.vulnerability
+	$suppressedVulnerabilities = $dependency.vulnerabilities.suppressedVulnerability
 	
 	Start-Test $name
 	
@@ -81,6 +111,7 @@ function Parse-Dependency($dependency) {
 	
 	if ($dependency.vulnerabilities) {
 		Parse-Vulnerabilities $name $vulnerabilities
+		Parse-SuppressedVulnerabilities $name $suppressedVulnerabilities
 	}
 	
 	End-Test($name)
@@ -101,6 +132,20 @@ function Parse-Vulnerability([string]$name, $vulnerability){
 	Fail-Test $name $message $details
 }
 
+function Parse-SuppressedVulnerabilities([string]$name, $vulnerabilities){
+	Foreach ($vulnerability in $vulnerabilities) {
+		Parse-SuppressedVulnerability $name $vulnerability
+	}
+}
+
+function Parse-SuppressedVulnerability([string]$name, $vulnerability){
+	[string]$vulnerabilityName = Clean-String($vulnerability.name)
+	[string]$vulnerabilitySeverity = Clean-String($vulnerability.severity)
+	[string]$message = "[SUPPRESSED] {0} ({1})" -f $vulnerabilityName, $vulnerabilitySeverity
+	
+	Update-Test $name $message
+}
+
 function Has-Vulnerability($dependencies) {
 	$vulnerabilityFound = $FALSE
 	Foreach ($dependency IN $dependencies) {
@@ -118,6 +163,8 @@ function Clean-String([string]$string){
 	$string
 }
 
+### TeamCity Test Service Messages
+
 function Start-Test([string]$name){
 	Write-Output ("##teamcity[testStarted name='{0}']" -f $name)
 }
@@ -134,25 +181,8 @@ function End-Test([string]$name){
 	Write-Output ("##teamcity[testFinished name='{0}']" -f $name)
 }
 
-function Get-FileExtensionFromPath([string]$path){
-	$parts = $path.Split('.')
-	$ext = $parts[$parts.Length-1]
-	$ext.ToUpper()
-}
-
-function Get-Args([string]$inputFilePath, [string]$outputFilePath, [string]$suppressionFilePath, [string]$additionalArgs){
-	$format = Get-FileExtensionFromPath $outputFilePath
-	[string]$dcArgs = '-a "VulnerabilityScan" -s "{0}" -o "{1}" -f "{2}"' -f $inputFilePath, $outputFilePath, $format
-	
-	if (Test-Path $suppressionFilePath) {
-		$dcArgs = '{0} --suppression "{1}"' -f $dcArgs, $suppressionFilePath
-	}
-	
-	if ($additionalArgs) {
-		$dcArgs = '{0} {1}' -f $dcArgs, $additionalArgs
-	}
-	
-	$dcArgs
+function Delete-File([string]$path) {
+	Invoke-Expression ('DEL {0}' -f $path)
 }
 
 #
@@ -194,7 +224,7 @@ function Set-PSConsole {
 
 [string]$javaCmd = '{0} {1}' -f $java, $opts
 
-[string]$scanArgs = Get-Args $inputPath $xmlPath $suppressPath $etc
+[string]$scanArgs = Get-DependencyCheckArgs $inputPath $xmlPath $suppressPath $etc
 Run-DependencyCheck $javaCmd $dcPath $scanArgs
 
 $dependencies = Get-Dependencies $xmlPath
@@ -203,11 +233,11 @@ Set-PSConsole
 
 Parse-Dependencies $dependencies
 
-Invoke-Expression ('DEL {0}' -f $xmlPath)
+#Delete-File $xmlPath
 
 if (Has-Vulnerability $dependencies) {
 	Write-Output ("Vulnerability found -- generating report artifact: {0}" -f $htmlFilename)
-	[string]$artifactArgs = Get-Args $inputPath $htmlPath $suppressPath $etc
+	[string]$artifactArgs = Get-DependencyCheckArgs $inputPath $htmlPath $suppressPath $etc
 	Run-DependencyCheck $javaCmd $dcPath $artifactArgs
 }
 

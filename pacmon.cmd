@@ -1,1 +1,1 @@
-CALL PowerShell.exe .\pacmon.ps1 -target "%*"
+CALL PowerShell.exe .\pacmon.ps1 -target "%*" -etc "-n"
