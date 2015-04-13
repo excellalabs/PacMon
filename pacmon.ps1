@@ -143,7 +143,7 @@ function Parse-SuppressedVulnerability([string]$name, $vulnerability){
 	[string]$vulnerabilitySeverity = Clean-String($vulnerability.severity)
 	[string]$message = "[SUPPRESSED] {0} ({1})" -f $vulnerabilityName, $vulnerabilitySeverity
 	
-	Update-Test $name $message
+	Ignore-Test $name $message
 }
 
 function Has-Vulnerability($dependencies) {
@@ -171,6 +171,10 @@ function Start-Test([string]$name){
 
 function Update-Test([string]$name, [string]$text){
 	Write-Output ("##teamcity[testStdOut name='{0}' out='{1}']" -f $name, $text)
+}
+
+function Ignore-Test([string]$name, [string]$message){
+	Write-Output ("##teamcity[testIgnored name='{0}' message='{1}']" -f $name, $message)
 }
 
 function Fail-Test([string]$name, [string]$message, [string]$details){
@@ -233,7 +237,7 @@ Set-PSConsole
 
 Parse-Dependencies $dependencies
 
-#Delete-File $xmlPath
+Delete-File $xmlPath
 
 if (Has-Vulnerability $dependencies) {
 	Write-Output ("Vulnerability found -- generating report artifact: {0}" -f $htmlFilename)
