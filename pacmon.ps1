@@ -72,6 +72,22 @@ function cleanString([string]$string){
 	$string
 }
 
+function executeDependencyCheck([string]$dcPath, [string]$cmdLineArgs){
+	[string]$javaCmd = 'java'
+	[string]$javaOpts = ''
+	
+	[string]$repoPath = '{0}\repo' -f $dcPath
+	
+	# set classpath
+	[string]$classPath = '"{0}"\etc;"{1}"\commons-cli\commons-cli\1.2\commons-cli-1.2.jar;"{1}"\org\owasp\dependency-check-core\1.2.9\dependency-check-core-1.2.9.jar;"{1}"\org\apache\commons\commons-compress\1.9\commons-compress-1.9.jar;"{1}"\commons-io\commons-io\2.4\commons-io-2.4.jar;"{1}"\commons-lang\commons-lang\2.6\commons-lang-2.6.jar;"{1}"\org\apache\lucene\lucene-core\4.7.2\lucene-core-4.7.2.jar;"{1}"\org\apache\lucene\lucene-analyzers-common\4.7.2\lucene-analyzers-common-4.7.2.jar;"{1}"\org\apache\lucene\lucene-queryparser\4.7.2\lucene-queryparser-4.7.2.jar;"{1}"\org\apache\lucene\lucene-queries\4.7.2\lucene-queries-4.7.2.jar;"{1}"\org\apache\lucene\lucene-sandbox\4.7.2\lucene-sandbox-4.7.2.jar;"{1}"\org\apache\velocity\velocity\1.7\velocity-1.7.jar;"{1}"\commons-collections\commons-collections\3.2.1\commons-collections-3.2.1.jar;"{1}"\com\h2database\h2\1.3.176\h2-1.3.176.jar;"{1}"\org\jsoup\jsoup\1.7.2\jsoup-1.7.2.jar;"{1}"\org\owasp\dependency-check-utils\1.2.9\dependency-check-utils-1.2.9.jar;"{1}"\org\owasp\dependency-check-cli\1.2.9\dependency-check-cli-1.2.9.jar' -f $dcPath, $repoPath
+	set-item -path Env:CLASSPATH -value $classPath
+	"CLASSPATH = $Env:CLASSPATH" 
+	
+	$command = '{0} {1} -classpath {2} -Dapp.name="dependency-check" -Dapp.repo="{3}" -Dapp.home="{4}" -Dbasedir="{4}" org.owasp.dependencycheck.App {5}' -f $javaCmd, $javaOpts, $classPath, $repoPath, $dcPath, $cmdLineArgs
+	Write-Output ("Executing cmd.exe /C {0}" -f $command)
+	cmd.exe /C $command
+}
+
 #http://stackoverflow.com/questions/1183183/path-of-currently-executing-powershell-script
 function Get-ScriptDirectory
 {
@@ -92,23 +108,22 @@ function Set-PSConsole {
 }
 
 ### BEGIN SCRIPT
-[string]$dcFilename = 'depcheck.bat'
+[string]$dcRelPath = 'dc'
 [string]$xmlFilename = 'output.xml'
 [string]$htmlFilename = 'vulnerabilities.html'
 [string]$inputRelPath = '.\Lambchop'
 
 [string]$basePath = Get-ScriptDirectory
 [string]$inputPath = '{0}\{1}' -f $basePath, $inputRelPath
-[string]$dcPath = '{0}\{1}' -f $basePath, $dcFilename
+[string]$dcPath = '{0}\{1}' -f $basePath, $dcRelPath
 [string]$xmlPath = '{0}\{1}' -f $basePath, $xmlFilename
 [string]$htmlPath = '{0}\{1}' -f $basePath, $htmlFilename
 
-[string]$checkCommand = '{0} -a "VulnerabilityScan" -s "{1}" -o "{2}" -f "XML"' -f $dcPath, $inputPath, $xmlPath
-[string]$artifactCommand = '{0} -a "VulnerabilityScan" -s "{1}" -o "{2}" -f "HTML"' -f $dcPath, $inputPath, $htmlPath
+[string]$scanArgs = '-a "VulnerabilityScan" -s "{0}" -o "{1}" -f "XML"' -f $inputPath, $xmlPath
+[string]$artifactArgs = '-a "VulnerabilityScan" -s "{0}" -o "{1}" -f "HTML"' -f $inputPath, $htmlPath
 [string]$deleteCommand = 'DEL {0}' -f $xmlPath
 
-Write-Output ("Executing cmd.exe /C {0}" -f $checkCommand)
-cmd.exe /C $checkCommand
+executeDependencyCheck $dcPath $scanArgs
 
 if (Test-Path $xmlPath) {
 	Write-Output ("Parsing XML output: {0}" -f $xmlPath)
@@ -141,7 +156,7 @@ Invoke-Expression $deleteCommand
 
 if (hasVulnerability $dependencies) {
 	Write-Output ("Vulnerability found -- generating report artifact: {0}" -f $htmlFilename)
-	cmd.exe /C $artifactCommand
+	executeDependencyCheck $dcRelPath $artifactArgs
 }
 
 exit(0)
