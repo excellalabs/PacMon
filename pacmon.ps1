@@ -37,6 +37,12 @@ Param(
 	[string]$h = "vulnerabilities.html"
 )
 
+[string]$suppressFilename = $s
+[string]$xmlFilename = $x
+[string]$htmlFilename = $h
+
+[string]$javaCmd = '{0} {1}' -f $java, $opts
+
 ### END INIT PARAMS
 
 function Get-DependencyCheckArgs([string]$inputFilePath, [string]$outputFilePath, [string]$suppressionFilePath, [string]$additionalArgs){
@@ -111,48 +117,45 @@ function Parse-Dependency($dependency) {
 }
 
 function Parse-Vulnerabilities([string]$name, $vulnerabilities, $suppressedVulnerabilities){
-	$ignoreTest = (($vulnerabilities.Length -eq 0) -and ($suppressedVulnerabilities.Length -ne 0))
-	
-	Foreach ($vulnerability in $vulnerabilities) {
-		Parse-Vulnerability $name $vulnerability
+	$failed = ($vulnerabilities.Length -gt 0)
+	$suppressed = ($suppressedVulnerabilities.Length -gt 0)
+
+	if ($failed) {
+		Foreach ($vulnerability in $vulnerabilities) {
+			Parse-Vulnerability $name $vulnerability
+		}
 	}
 	
-	Foreach ($vulnerability in $suppressedVulnerabilities) {
-		if ($ignoreTest) {
-			Parse-Vulnerability $name $vulnerability "ignore"
-		} else {
-			Parse-Vulnerability $name $vulnerability "update"
+	if ($suppressed) {
+		Foreach ($vulnerability in $suppressedVulnerabilities) {
+			if ($failed) {
+				Parse-Vulnerability $name $vulnerability "update"
+			} else {
+				Parse-Vulnerability $name $vulnerability "ignore"
+			}
 		}
 	}
 }
 
 function Parse-Vulnerability([string]$name, $vulnerability, [string]$action){
 	[string]$vulnerabilityName = Clean-String($vulnerability.name)
-	[string]$vulnerabilitySeverity = Clean-String($vulnerability.severity)
+	
+	if ($action){
+		[string]$vulnerabilitySeverity = "Suppressed"
+	} else {
+		[string]$vulnerabilitySeverity = Clean-String($vulnerability.severity)
+	}
+	
 	[string]$message = "{0} ({1})" -f $vulnerabilityName, $vulnerabilitySeverity
 	[string]$details = Clean-String($vulnerability.description)
 	
 	if ($action -eq "ignore") {
-		Ignore-Test $name ('[SUPPRESSED] {0}' -f $message)
+		Ignore-Test $name $message
 	} elseif ($action -eq "update") {
-		Update-Test $name ('[SUPPRESSED] {0}' -f $message)
+		Update-Test $name $message
 	} else {
 		Fail-Test $name $message $details
 	}
-}
-
-function Parse-SuppressedVulnerabilities([string]$name, $vulnerabilities){
-	Foreach ($vulnerability in $vulnerabilities) {
-		Parse-SuppressedVulnerability $name $vulnerability
-	}
-}
-
-function Parse-SuppressedVulnerability([string]$name, $vulnerability){
-	[string]$vulnerabilityName = Clean-String($vulnerability.name)
-	[string]$vulnerabilitySeverity = Clean-String($vulnerability.severity)
-	[string]$message = "[SUPPRESSED] {0} ({1})" -f $vulnerabilityName, $vulnerabilitySeverity
-	
-	Ignore-Test $name $message
 }
 
 function Has-Vulnerability($dependencies) {
@@ -231,21 +234,15 @@ function Set-PSConsole {
 
 ### BEGIN SCRIPT
 
-[string]$suppressFilename = $s
-[string]$xmlFilename = $x
-[string]$htmlFilename = $h
-
 [string]$basePath = Get-ScriptDirectory
-
 [string]$dcPath = '{0}\{1}' -f $basePath, $dc
 [string]$inputPath = '{0}\{1}' -f $basePath, $target
 [string]$xmlPath = '{0}\{1}' -f $basePath, $xmlFilename
 [string]$htmlPath = '{0}\{1}' -f $basePath, $htmlFilename
 [string]$suppressPath = '{0}\{1}' -f $basePath, $suppressFilename
 
-[string]$javaCmd = '{0} {1}' -f $java, $opts
+$scanArgs = Get-DependencyCheckArgs $inputPath $xmlPath $suppressPath $etc
 
-[string]$scanArgs = Get-DependencyCheckArgs $inputPath $xmlPath $suppressPath $etc
 Run-DependencyCheck $javaCmd $dcPath $scanArgs
 
 $dependencies = Validate-Dependencies $xmlPath
