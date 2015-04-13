@@ -142,7 +142,6 @@ Invoke-Expression $deleteCommand
 if (hasVulnerability $dependencies) {
 	Write-Output ("Vulnerability found -- generating report artifact: {0}" -f $htmlFilename)
 	cmd.exe /C $artifactCommand
-	exit(1)
 }
 
 exit(0)
