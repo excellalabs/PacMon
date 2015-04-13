@@ -50,23 +50,19 @@ function hasVulnerability($dependencies) {
 }
 
 function startTest([string]$name){
-	[string]$formattedOutput = "##teamcity[testStarted name='{0}']" -f $name
-	Write-Output $formattedOutput
+	Write-Output ("##teamcity[testStarted name='{0}']" -f $name)
 }
 
 function updateTest([string]$name, [string]$text){
-	[string]$formattedOutput = "##teamcity[testStdOut name='{0}' out='{1}']" -f $name, $text
-	Write-Output $formattedOutput
+	Write-Output ("##teamcity[testStdOut name='{0}' out='{1}']" -f $name, $text)
 }
 
 function failTest([string]$name, [string]$message, [string]$details){
-	[string]$formattedOutput = "##teamcity[testStdErr name='{0}' message='{1}' details='{2}']" -f $name, $message, $details
-	Write-Output $formattedOutput
+	Write-Output ("##teamcity[testFailed name='{0}' message='{1}' details='{2}']" -f $name, $message, $details)
 }
 
 function endTest([string]$name){
-	[string]$formattedOutput = "##teamcity[testFinished name='{0}']" -f $name
-	Write-Output $formattedOutput
+	Write-Output ("##teamcity[testFinished name='{0}']" -f $name)
 }
 
 function cleanString([string]$string){
