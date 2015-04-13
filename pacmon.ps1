@@ -104,52 +104,37 @@ function Parse-Dependency($dependency) {
 	Start-Test $name $description
 
 	if ($dependency.vulnerabilities) {
-		Parse-Vulnerabilities $name $dependency.vulnerabilities.vulnerability $dependency.vulnerabilities.suppressedVulnerability
+		Parse-Vulnerabilities $name $dependency
 	}
 	
 	End-Test($name)
 }
 
-function Parse-Vulnerabilities([string]$name, $vulnerabilities, $suppressedVulnerabilities){
-	$failed = ($vulnerabilities.Length -gt 0)
-	$suppressed = ($suppressedVulnerabilities.Length -gt 0)
-
-	if ($failed) {
-		Foreach ($vulnerability in $vulnerabilities) {
-			Parse-Vulnerability $name $vulnerability
-		}
+function Parse-Vulnerabilities([string]$name, $dependency){
+	Foreach ($vulnerability in $dependency.vulnerabilities.vulnerability ) {
+		Parse-Vulnerability $name $vulnerability
 	}
 	
-	if ($suppressed) {
-		Foreach ($vulnerability in $suppressedVulnerabilities) {
-			#if ($failed) {
-			#	Parse-Vulnerability $name $vulnerability "update"
-			#} else {
-				Parse-Vulnerability $name $vulnerability "ignore"
-			#}
-		}
+	Foreach ($vulnerability in $dependency.vulnerabilities.suppressedVulnerability) {
+		Parse-SuppressedVulnerability $name $vulnerability
 	}
 }
 
-function Parse-Vulnerability([string]$name, $vulnerability, [string]$action){
+function Parse-Vulnerability([string]$name, $vulnerability){
+	[string]$message = Get-TestMessage $vulnerability
+	[string]$details = Clean-String($vulnerability.description)
+	Fail-Test $name $message $details
+}
+
+function Parse-SuppressedVulnerability([string]$name, $vulnerability){
+	[string]$message = "SUPPRESSED: {0}" -f (Get-TestMessage $vulnerability)
+	Ignore-Test $name $message
+}
+
+function Get-TestMessage($vulnerability) {
 	[string]$vulnerabilityName = Clean-String($vulnerability.name)
 	[string]$vulnerabilitySeverity = Clean-String($vulnerability.severity)
-		
-	if (($action -eq "ignore") -or ($action -eq "update")){
-		[string]$message = "SUPPRESSED: {0} ({1})" -f $vulnerabilityName, $vulnerabilitySeverity
-	} else {
-		[string]$message = "{0} ({1})" -f $vulnerabilityName, $vulnerabilitySeverity
-	}
-	
-	[string]$details = Clean-String($vulnerability.description)
-	
-	if ($action -eq "ignore") {
-		Ignore-Test $name $message
-	} elseif ($action -eq "update") {
-		Update-Test $name $message
-	} else {
-		Fail-Test $name $message $details
-	}
+	("{0} ({1})" -f $vulnerabilityName, $vulnerabilitySeverity)
 }
 
 function Has-Vulnerability($dependencies) {
@@ -185,7 +170,7 @@ function Fail-Test([string]$name, [string]$message, [string]$details){
 }
 
 function End-Test([string]$name){
-	Write-Output ("Finishing Test '{0}'" -f $name)
+	Write-Output ("Finishing Test: '{0}'" -f $name)
 	Write-Output ("##teamcity[testFinished name='{0}']" -f $name)
 }
 
