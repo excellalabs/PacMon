@@ -151,26 +151,21 @@ function Has-Vulnerability($dependencies) {
 
 function Start-Test([string]$name, [string]$message){
 	Write-Output ("##teamcity[testStarted name='{0}' captureStandardOutput='{1}']" -f $name, $message)
-	Write-Output ("Starting Test: '{0}'" -f $name)
 }
 
 function Update-Test([string]$name, [string]$message){
-	Write-Output ("Updating Test: '{0}'" -f $name)
 	Write-Output ("##teamcity[testStdOut name='{0}' out='{1}']" -f $name, $message)
 }
 
 function Ignore-Test([string]$name, [string]$message){
-	Write-Output ("Ignoring Test: '{0}'" -f $name)
 	Write-Output ("##teamcity[testIgnored name='{0}' message='{1}']" -f $name, $message)
 }
 
 function Fail-Test([string]$name, [string]$message, [string]$details){
-	Write-Output ("Failing Test: '{0}'" -f $name)
 	Write-Output ("##teamcity[testFailed name='{0}' message='{1}' details='{2}']" -f $name, $message, $details)
 }
 
 function End-Test([string]$name){
-	Write-Output ("Finishing Test: '{0}'" -f $name)
 	Write-Output ("##teamcity[testFinished name='{0}']" -f $name)
 }
 
@@ -235,7 +230,7 @@ Set-PSConsole
 
 Parse-Dependencies $dependencies
 
-#Delete-File $xmlPath
+Delete-File $xmlPath
 
 if (Has-Vulnerability $dependencies) {
 	Write-Output ("Vulnerability found -- generating report artifact: {0}" -f $htmlFilename)
