@@ -8,6 +8,10 @@ Param(
 	[Parameter(Mandatory=$TRUE)]
 	[string]$target,
 	
+	# -app <project title>
+	[Parameter(Mandatory=$FALSE)]
+	[string]$app = "PacMon",
+	
 	# -java <full path to java>
 	[Parameter(Mandatory=$FALSE)]
 	[string]$java = "java",	
@@ -45,9 +49,9 @@ Param(
 
 ### END INIT PARAMS
 
-function Get-DependencyCheckArgs([string]$inputFilePath, [string]$outputFilePath, [string]$suppressionFilePath, [string]$additionalArgs){
+function Get-DependencyCheckArgs([string]$projectName, [string]$inputFilePath, [string]$outputFilePath, [string]$suppressionFilePath, [string]$additionalArgs){
 	$format = Get-FileExtensionFromPath $outputFilePath
-	[string]$dcArgs = '-a "VulnerabilityScan" -s "{0}" -o "{1}" -f "{2}"' -f $inputFilePath, $outputFilePath, $format
+	[string]$dcArgs = '-a "{0}" -s "{1}" -o "{2}" -f "{3}"' -f $projectName, $inputFilePath, $outputFilePath, $format
 	
 	if (Test-Path $suppressionFilePath) {
 		$dcArgs = '{0} --suppression "{1}"' -f $dcArgs, $suppressionFilePath
@@ -162,7 +166,7 @@ function Ignore-Test([string]$name, [string]$message){
 }
 
 function Fail-Test([string]$name, [string]$message, [string]$details){
-	Write-Output ("##teamcity[testFailed name='{0}' message='{1}' details='{2}']" -f $name, $message, $details)
+	Write-Output ("##teamcity[testFailed name='{0}' type='vulnerability' message='{1}' details='{2}']" -f $name, $message, $details)
 }
 
 function End-Test([string]$name){
@@ -220,7 +224,7 @@ function Set-PSConsole {
 [string]$htmlPath = '{0}\{1}' -f $basePath, $htmlFilename
 [string]$suppressPath = '{0}\{1}' -f $basePath, $suppressFilename
 
-$scanArgs = Get-DependencyCheckArgs $inputPath $xmlPath $suppressPath $etc
+$scanArgs = Get-DependencyCheckArgs $app $inputPath $xmlPath $suppressPath $etc
 
 Run-DependencyCheck $javaCmd $dcPath $scanArgs
 
@@ -234,7 +238,7 @@ Delete-File $xmlPath
 
 if (Has-Vulnerability $dependencies) {
 	Write-Output ("Vulnerability found -- generating report artifact: {0}" -f $htmlFilename)
-	[string]$artifactArgs = Get-DependencyCheckArgs $inputPath $htmlPath $suppressPath $etc
+	[string]$artifactArgs = Get-DependencyCheckArgs $app $inputPath $htmlPath $suppressPath $etc
 	Run-DependencyCheck $javaCmd $dcPath $artifactArgs
 }
 
