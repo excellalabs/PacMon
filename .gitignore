@@ -3,3 +3,4 @@ data/
 packages/
 output.xml
 vulnerabilities.html
+obj/
