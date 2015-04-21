@@ -7,4 +7,11 @@
 		<sha1>17245DA7DAB3799B45815A105B8FFA414CF73D43</sha1>
 		<cpe>cpe:/a:jquery:jquery:2.1.3</cpe>
 	</suppress>
+	<suppress>
+		<notes><![CDATA[
+		file name: Microsoft.AspNet.Identity.Core.2.2.1.nupkg: Microsoft.AspNet.Identity.Core.nuspec
+		]]></notes>
+		<sha1>041DCCAF76E8441E735CC078F93F1F3B0003D94E</sha1>
+		<cve>CVE-2008-0333</cve>
+	</suppress>
 </suppressions>
